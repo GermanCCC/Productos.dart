@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:prueba/components/product_card.dart';
+import 'package:prueba/models/producto.dart';
 import 'package:prueba/provider/productos.dart';
 import 'package:uuid/uuid.dart';
 
@@ -12,141 +13,178 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  // * Variables y controladores
+  // * Form + controllers (UI state)
   final _form = GlobalKey<FormState>();
-  final _nombreCtrl = TextEditingController(); // ⭐
 
-  // * Funciones
-  void _agregarProductos(BuildContext context) {
-    showDialog(
+  final _nombreCtrl = TextEditingController();
+  final _marcaCtrl = TextEditingController();
+  final _categoriaCtrl = TextEditingController();
+  final _precioCtrl = TextEditingController();
+
+  final _uuid = const Uuid();
+  @override
+  void dispose() {
+    _nombreCtrl.dispose();
+    _marcaCtrl.dispose();
+    _categoriaCtrl.dispose();
+    _precioCtrl.dispose();
+    super.dispose();
+  }
+
+  // ===== Helpers UI =====
+
+  void _limpiarCampos() {
+    _nombreCtrl.clear();
+    _marcaCtrl.clear();
+    _categoriaCtrl.clear();
+    _precioCtrl.clear();
+  }
+
+  void _abrirDialogAgregarProducto() {
+    _limpiarCampos();
+
+    showDialog<void>(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Agregar Producto'),
-          content: Form(
-            key: _form,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  controller: _nombreCtrl,
-                  decoration: InputDecoration(labelText: 'Nombre del producto'),
-                  validator: (Nombre) {
-                    if (Nombre == null || Nombre.trim().isEmpty) {
-                      return 'No mames we';
-                    }
-                    if (Nombre.length > 50) {
-                      return 'Muy largo we';
-                    }
-                    if (Nombre.length < 3) {
-                      return 'Muy corto we';
-                    }
-                    // ⭐ VALIDACIÓN DE NOMBRE EXISTENTE
-                    final existe = context.read<Productos>().nombreExiste(
-                      Nombre,
-                    );
-                    if (existe) {
-                      return 'Ya existe we';
-                    }
+      builder: (dialogContext) => _buildAgregarProductoDialog(dialogContext),
+    );
+  }
 
-                    return null;
-                  },
-                ),
-
-                TextFormField(
-                  decoration: InputDecoration(labelText: 'Marca'),
-                  validator: (Marca) {
-                    if (Marca == null ||
-                        Marca.trim().isEmpty ||
-                        Marca.length < 3 ||
-                        Marca.length > 20) {
-                      return 'No mames we';
-                    }
-                    return null;
-                  },
-                ),
-                TextFormField(
-                  decoration: InputDecoration(labelText: 'Categoría'),
-                  validator: (Categoria) {
-                    if (Categoria == null || Categoria.trim().isEmpty) {
-                      return 'No mames we';
-                    }
-                    // ⭐ Normaliza texto de categoría
-                    String _normalizarCategoria(String categoria) {
-                      final c = categoria.trim().toLowerCase();
-                      if (c.isEmpty) return c;
-
-                      // Primera letra en mayúscula (opcional, estética)
-                      return c[0].toUpperCase() + c.substring(1);
-                    }
-
-                    // ⭐ Verifica si la categoría ya existe (ignora mayúsculas)
-                    bool categoriaExiste(String categoria) {
-                      final c = categoria.trim().toLowerCase();
-                      return _catalogo.any(
-                        (p) => p.categoria.trim().toLowerCase() == c,
-                      );
-                    }
-
-                    // ⭐ Devuelve la categoría correcta (existente o nueva)
-                    String obtenerCategoriaFinal(String categoria) {
-                      final c = categoria.trim().toLowerCase();
-
-                      for (final p in _catalogo) {
-                        if (p.categoria.trim().toLowerCase() == c) {
-                          return p.categoria; // ya existe → reutiliza
-                        }
-                      }
-
-                      // no existe → se crea normalizada
-                      return _normalizarCategoria(categoria);
-                    }
-
-                    return null;
-                  },
-                ),
-                TextFormField(
-                  decoration: InputDecoration(labelText: 'Precio'),
-                  validator: (precio) {
-                    if (precio == null || precio.trim().isEmpty) {
-                      return 'No mames we';
-                    }
-                    if (precio.contains(RegExp(r'[A-Za-z]'))) {
-                      return 'Solo numeros we';
-                    }
-                    final p = double.tryParse(precio.replaceAll(',', '.'));
-                    if (p == null) {
-                      return 'Solo numeros we';
-                    }
-                    if (p <= 0) {
-                      return 'no lo regales we';
-                    }
-                    return null;
-                  },
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancelar'),
-            ),
-            SizedBox(width: 100),
-            TextButton(onPressed: _submitForm, child: const Text('Aceptar')),
+  // ! Agregar para subir fotos
+  //* ===== Formulario Agregar Producto =====
+  AlertDialog _buildAgregarProductoDialog(BuildContext dialogContext) {
+    return AlertDialog(
+      title: const Text('Agregar Producto'),
+      content: Form(
+        key: _form,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildNombreField(),
+            _buildMarcaField(),
+            _buildCategoriaField(),
+            _buildPrecioField(),
           ],
-        );
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext),
+          child: const Text('Cancelar'),
+        ),
+        const SizedBox(width: 100),
+        TextButton(
+          onPressed: () => _submitForm(dialogContext),
+          child: const Text('Aceptar'),
+        ),
+      ],
+    );
+  }
+
+  TextFormField _buildNombreField() {
+    return TextFormField(
+      controller: _nombreCtrl,
+      decoration: const InputDecoration(labelText: 'Nombre del producto'),
+      validator: (Nombre) {
+        if (Nombre == null || Nombre.trim().isEmpty) {
+          return 'No mames we';
+        }
+        if (Nombre.length > 50) {
+          return 'Muy largo we';
+        }
+        if (Nombre.length < 3) {
+          return 'Muy corto we';
+        }
+
+        final existe = context.read<Productos>().nombreExiste(Nombre);
+        if (existe) {
+          return 'Ya existe we';
+        }
+
+        return null;
       },
     );
   }
 
-  void _submitForm() {
-    if (_form.currentState!.validate() == false) return;
-    final uuid = Uuid();
-    print(uuid.v4());
+  TextFormField _buildMarcaField() {
+    return TextFormField(
+      controller: _marcaCtrl,
+      decoration: const InputDecoration(labelText: 'Marca'),
+      validator: (Marca) {
+        if (Marca == null ||
+            Marca.trim().isEmpty ||
+            Marca.length < 3 ||
+            Marca.length > 20) {
+          return 'No mames we';
+        }
+        return null;
+      },
+    );
+  }
 
-    print('validanding');
-    print('que peo we');
+  TextFormField _buildCategoriaField() {
+    return TextFormField(
+      controller: _categoriaCtrl,
+      decoration: const InputDecoration(labelText: 'Categoría'),
+      validator: (Categoria) {
+        if (Categoria == null || Categoria.trim().isEmpty) {
+          return 'No mames we';
+        }
+        return null;
+      },
+    );
+  }
+
+  TextFormField _buildPrecioField() {
+    return TextFormField(
+      controller: _precioCtrl,
+      decoration: const InputDecoration(labelText: 'Precio'),
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      validator: (precio) {
+        if (precio == null || precio.trim().isEmpty) {
+          return 'No mames we';
+        }
+        if (precio.contains(RegExp(r'[A-Za-z]'))) {
+          return 'Solo numeros we';
+        }
+        final p = double.tryParse(precio.replaceAll(',', '.'));
+        if (p == null) {
+          return 'Solo numeros we';
+        }
+        if (p <= 0) {
+          return 'no lo regales we';
+        }
+        return null;
+      },
+    );
+  }
+
+  //* ===== Submit =====
+
+  void _submitForm(BuildContext dialogContext) {
+    if (_form.currentState!.validate() == false) return;
+
+    final prov = context.read<Productos>();
+
+    final id = _uuid.v4();
+    final nombre = _nombreCtrl.text.trim();
+    final marca = _marcaCtrl.text.trim();
+    final categoriaFinal = prov.obtenerCategoriaFinal(_categoriaCtrl.text);
+    final precio = double.parse(_precioCtrl.text.trim().replaceAll(',', '.'));
+    final producto = Producto(
+      id: id,
+      sku: 'SKU-${id.substring(0, 6)}',
+      nombre: nombre,
+      marca: marca,
+      categoria: categoriaFinal,
+      precioBase: precio,
+      stock: 0,
+      rating: 0,
+      imagen: '',
+    );
+
+    prov.agregar(producto);
+
+    Navigator.pop(dialogContext);
   }
 
   @override
@@ -159,7 +197,6 @@ class _HomePageState extends State<HomePage> {
       appBar: AppBar(title: const Text('Tienda')),
       body: Column(
         children: [
-          // Buscador
           Padding(
             padding: const EdgeInsets.all(12),
             child: TextField(
@@ -170,13 +207,11 @@ class _HomePageState extends State<HomePage> {
                 border: const OutlineInputBorder(),
                 suffixIcon: IconButton(
                   icon: const Icon(Icons.add_box_outlined),
-                  onPressed: () => _agregarProductos(context),
+                  onPressed: _abrirDialogAgregarProducto,
                 ),
               ),
             ),
           ),
-
-          // Categorías
           SizedBox(
             height: 44,
             child: ListView.separated(
@@ -194,10 +229,7 @@ class _HomePageState extends State<HomePage> {
               },
             ),
           ),
-
           const SizedBox(height: 12),
-
-          // Grid
           Expanded(
             child: productos.isEmpty
                 ? const Center(
@@ -211,16 +243,10 @@ class _HomePageState extends State<HomePage> {
                           crossAxisCount: 3,
                           mainAxisSpacing: 12,
                           crossAxisSpacing: 12,
-                          // childAspectRatio: 1.5,
                         ),
-
                     itemBuilder: (context, i) {
                       final p = productos[i];
-                      return ProductCard(
-                        p: p,
-                        onTap: () {}, // detalle lo metemos después
-                        onAdd: () {}, // carrito lo metemos después
-                      );
+                      return ProductCard(p: p, onTap: () {}, onAdd: () {});
                     },
                   ),
           ),

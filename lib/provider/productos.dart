@@ -40,19 +40,39 @@ class Productos extends ChangeNotifier {
     }).toList();
   }
 
-  // ===== METODOS DE CATALOGO (CRUD) =====
+  // ===== REGLAS / HELPERS =====
+
   bool nombreExiste(String nombre) {
-    // ⭐
     final n = nombre.trim().toLowerCase();
     return _catalogo.any((p) => p.nombre.trim().toLowerCase() == n);
   }
 
+  bool categoriaExiste(String categoria) {
+    final c = categoria.trim().toLowerCase();
+    return _catalogo.any((p) => p.categoria.trim().toLowerCase() == c);
+  }
+
+  String obtenerCategoriaFinal(String categoria) {
+    final c = categoria.trim().toLowerCase();
+
+    for (final p in _catalogo) {
+      if (p.categoria.trim().toLowerCase() == c) {
+        return p.categoria; // reutiliza formato existente
+      }
+    }
+
+    final limpia = categoria.trim();
+    if (limpia.isEmpty) return limpia;
+
+    // Normalización simple: primera mayúscula + resto minúscula
+    return limpia[0].toUpperCase() + limpia.substring(1).toLowerCase();
+  }
+
+  // ===== METODOS DE CATALOGO (CRUD) =====
+
   void cargarDemo() {
     if (_catalogo.isNotEmpty) return;
-    /*           
-'https://static.nike.com/a/images/t_web_pdp_936_v2/f_auto/2a3b1721-2428-498b-ab17-f962ff6294d1/NIKE+COURT+LEGACY+%28PSV%29.png',
-          'https://static.nike.com/a/images/t_web_pdp_936_v2/f_auto/73bfd1aa-6841-421f-9d4f-e0253cd1da0e/WMNS+NIKE+DUNK+LOW.png',
-          'https://b2cimpulsmx.vtexassets.com/arquivos/ids/376024-800-800?v=638716165441400000&width=800&height=800&aspect=true', */
+
     _catalogo.addAll([
       Producto(
         imagen:
