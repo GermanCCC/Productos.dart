@@ -22,7 +22,7 @@ class UsersCard extends StatelessWidget {
                 width: 64,
                 height: 64,
                 decoration: BoxDecoration(
-                  color: user.colorSexo.withOpacity(0.2),
+                  color: user.colorSexo.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(user.iconoSexo, color: user.colorSexo, size: 36),
